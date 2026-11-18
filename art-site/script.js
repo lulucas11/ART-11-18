@@ -59,18 +59,54 @@ document.getElementById('lbClose').addEventListener('click', closeLb);
 lb.addEventListener('click', e => { if(e.target === lb) closeLb(); });
 document.addEventListener('keydown', e => { if(e.key === 'Escape') closeLb(); });
 
-/* ===== Contact form -> mailto ===== */
-document.getElementById('contactForm').addEventListener('submit', e => {
+/* ===== Contact form -> FormSubmit AJAX ===== */
+const contactForm = document.getElementById('contactForm');
+const formMsg = document.getElementById('formMsg');
+
+contactForm.addEventListener('submit', async e => {
   e.preventDefault();
-  const f = e.target;
-  const body = [
-    'Name: ' + f.name.value,
-    'Organisation: ' + f.org.value,
-    'Email: ' + f.email.value,
-    'Region of interest: ' + f.region.value,
-    '',
-    'Message:',
-    f.message.value
-  ].join('\n');
-  window.location.href = 'mailto:307534719@qq.com?subject=' + encodeURIComponent('ART enquiry from ' + f.org.value) + '&body=' + encodeURIComponent(body);
+  const submitBtn = contactForm.querySelector('button[type="submit"]');
+  const endpoint = contactForm.dataset.email;
+
+  if (!endpoint || endpoint.indexOf('__FORM_EMAIL__') !== -1) {
+    formMsg.textContent = 'The contact form is not configured yet. Please contact us directly by email.';
+    formMsg.className = 'form-msg error';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  const original = submitBtn.innerHTML;
+  submitBtn.textContent = 'Sending…';
+  formMsg.textContent = '';
+
+  const payload = {
+    name: contactForm.elements.name.value,
+    organisation: contactForm.elements.org.value,
+    email: contactForm.elements.email.value,
+    region: contactForm.elements.region.value,
+    message: contactForm.elements.message.value,
+    _subject: 'ART website enquiry — ' + contactForm.elements.org.value
+  };
+
+  try {
+    const res = await fetch('https://formsubmit.co/ajax/' + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success !== false) {
+      formMsg.textContent = 'Thank you — your enquiry has been sent. We will be in touch shortly.';
+      formMsg.className = 'form-msg success';
+      contactForm.reset();
+    } else {
+      throw new Error(data.message || 'Submission failed');
+    }
+  } catch (err) {
+    formMsg.textContent = 'Sorry, we could not send your message. Please try again or contact us directly by email.';
+    formMsg.className = 'form-msg error';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = original;
+  }
 });
